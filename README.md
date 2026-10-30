@@ -1,3 +1,5 @@
+![Banner](banner.png)
+
 # file-forensic-timeline
 Creates a timeline of file modifications, access times, and metadata changes to aid in forensic investigations, leveraging stat and metadata libraries. - Focused on File operations and analysis
 
