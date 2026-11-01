@@ -44,6 +44,10 @@ def get_file_metadata(file_path):
             third_value = datetime.datetime.fromtimestamp(stat_info.st_birthtime).isoformat()
         else:
             third_label = "changed_time"
+            # Every timestamp here is converted with fromtimestamp, which uses the
+            # local timezone of the machine running the scan and produces a naive
+            # value with no offset recorded. Two timelines built on machines in
+            # different timezones cannot be merged by comparing their strings.
             third_value = datetime.datetime.fromtimestamp(stat_info.st_ctime).isoformat()
 
         metadata = {
@@ -99,6 +103,10 @@ def collect_rows(files):
             rows.append(metadata)
         else:
             logging.warning(f"Could not process file: {file_path}")
+    # Sorting uses the raw epoch value in the underscored key, not the ISO
+    # string in the visible column. The string would sort the same way on
+    # one machine, but the epoch is the honest key, and the underscore key
+    # is left out of the CSV field list in write_rows.
     rows.sort(key=lambda row: row["_mtime"])
     return rows
 
@@ -106,6 +114,10 @@ def write_rows(rows, out):
     """Writes rows as CSV with a header row, using the csv module quoting."""
     if not rows:
         return
+    # The header takes its third column name from the first row. Every row
+    # in a run shares the label, because the label depends on the platform
+    # the scan runs on, not on the file, so borrowing it from row one is
+    # safe here.
     third_label = rows[0]["third_time_label"]
     fieldnames = ["modified_time", "accessed_time", third_label, "file_path", "file_name", "file_size", "permissions", "owner_uid", "owner_gid"]
     writer = csv.writer(out)
@@ -149,6 +161,10 @@ def main():
     # Collect the file list before opening the output, so the output
     # file is never part of its own scan.
     try:
+        # Collection finishes before the output file is opened, and the
+        # resolved output path is excluded from the candidates. Without both
+        # halves of that, a recursive scan writing into the scanned directory
+        # would list its own half written output as evidence.
         files = collect_files(path, args.recursive, output_resolved)
     except OSError as e:
         logging.error(f"Error accessing path {path}: {e}")
